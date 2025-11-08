@@ -157,11 +157,11 @@ class Ghost:
             
             if 0 <= new_x < COLS and 0 <= new_y < ROWS and maze[new_y][new_x] != 1:
                 distance = abs(new_x - pacman.x) + abs(new_y - pacman.y)
-                possible_moves.append((distance, direction, new_x, new_y))
+                possible_moves.append((distance, new_x, new_y, direction))
         
         if possible_moves:
-            possible_moves.sort()
-            _, self.direction, self.x, self.y = possible_moves[0]
+            possible_moves.sort(key=lambda x: x[0])
+            _, self.x, self.y, self.direction = possible_moves[0]
     
     def draw(self, screen):
         center_x = self.x * CELL_SIZE + CELL_SIZE // 2
