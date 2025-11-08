@@ -4,6 +4,7 @@ from enum import Enum
 
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init()
 
 # Constants
 WIDTH, HEIGHT = 560, 620
@@ -277,10 +278,47 @@ def count_pellets():
                 count += 1
     return count
 
+def create_power_sound():
+    """Create a spooky sound effect for power mode"""
+    duration = 0.3
+    sample_rate = 22050
+    # Create descending tone for spooky effect
+    t = pygame.sndarray.make_sound(
+        (32767 * 0.3 * (
+            0.5 * (1 + pygame.math.Vector2(1, 0).rotate(
+                360 * 220 * t / sample_rate - 100 * t * t / (sample_rate * sample_rate)
+            ).x)
+        )).astype('int16')
+        for t in range(int(duration * sample_rate))
+    )
+    return t
+
+def create_eat_ghost_sound():
+    """Create a sound effect for eating ghosts"""
+    duration = 0.2
+    sample_rate = 22050
+    import numpy as np
+    # Create ascending tone
+    frequency = 440
+    t = np.linspace(0, duration, int(sample_rate * duration))
+    wave = np.sin(2 * np.pi * frequency * t * (1 + t * 2))
+    wave = (wave * 32767 * 0.3).astype('int16')
+    sound = pygame.sndarray.make_sound(wave)
+    return sound
+
 def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Pac-Man")
     clock = pygame.time.Clock()
+    
+    # Create sound effects
+    try:
+        import numpy as np
+        power_sound = create_power_sound()
+        eat_ghost_sound = create_eat_ghost_sound()
+    except:
+        power_sound = None
+        eat_ghost_sound = None
     
     pacman = PacMan()
     ghosts = [
@@ -326,6 +364,8 @@ def main():
             maze[pacman.y][pacman.x] = 0
             score += 50
             pacman.power_mode = 100  # Power mode lasts 100 frames (10 seconds)
+            if power_sound:
+                power_sound.play()
         
         # Check if all pellets are collected
         if count_pellets() == 0:
@@ -350,6 +390,8 @@ def main():
                     # Eat the ghost
                     ghost.eaten = True
                     score += 200
+                    if eat_ghost_sound:
+                        eat_ghost_sound.play()
                 else:
                     # Game over - reset positions
                     pacman.x = 14
