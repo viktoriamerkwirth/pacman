@@ -68,6 +68,7 @@ class PacMan:
         self.direction = Direction.LEFT
         self.next_direction = Direction.LEFT
         self.mouth_open = 0
+        self.power_mode = 0  # Frames remaining in power mode
         
     def move(self):
         # Try to change direction
@@ -140,9 +141,26 @@ class Ghost:
         self.y = y
         self.color = color
         self.direction = Direction.LEFT
+        self.eaten = False
         
     def move(self, pacman):
-        # Simple AI: try to move towards Pac-Man
+        # If eaten, return to start position
+        if self.eaten:
+            if self.x == self.start_x and self.y == self.start_y:
+                self.eaten = False
+            else:
+                # Move towards start position
+                if self.x < self.start_x:
+                    self.x += 1
+                elif self.x > self.start_x:
+                    self.x -= 1
+                elif self.y < self.start_y:
+                    self.y += 1
+                elif self.y > self.start_y:
+                    self.y -= 1
+                return
+        
+        # Simple AI: try to move towards Pac-Man (or away if power mode)
         possible_moves = []
         
         for direction in [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT]:
@@ -160,23 +178,38 @@ class Ghost:
                 possible_moves.append((distance, new_x, new_y, direction))
         
         if possible_moves:
-            possible_moves.sort(key=lambda x: x[0])
+            # If Pac-Man is in power mode, run away (choose furthest move)
+            if pacman.power_mode > 0:
+                possible_moves.sort(key=lambda x: x[0], reverse=True)
+            else:
+                possible_moves.sort(key=lambda x: x[0])
             _, self.x, self.y, self.direction = possible_moves[0]
     
-    def draw(self, screen):
+    def draw(self, screen, power_mode):
         center_x = self.x * CELL_SIZE + CELL_SIZE // 2
         center_y = self.y * CELL_SIZE + CELL_SIZE // 2
         radius = CELL_SIZE // 2 - 2
         
+        # If eaten, draw eyes only
+        if self.eaten:
+            pygame.draw.circle(screen, WHITE, (center_x - 3, center_y), 4)
+            pygame.draw.circle(screen, WHITE, (center_x + 3, center_y), 4)
+            pygame.draw.circle(screen, BLUE, (center_x - 3, center_y), 2)
+            pygame.draw.circle(screen, BLUE, (center_x + 3, center_y), 2)
+            return
+        
+        # Color changes when vulnerable
+        ghost_color = (0, 0, 150) if power_mode > 0 else self.color
+        
         # Body
-        pygame.draw.circle(screen, self.color, (center_x, center_y - 2), radius)
-        pygame.draw.rect(screen, self.color, (center_x - radius, center_y - 2, radius * 2, radius))
+        pygame.draw.circle(screen, ghost_color, (center_x, center_y - 2), radius)
+        pygame.draw.rect(screen, ghost_color, (center_x - radius, center_y - 2, radius * 2, radius))
         
         # Wavy bottom
         wave_width = radius * 2 // 3
         for i in range(3):
             x = center_x - radius + i * wave_width
-            pygame.draw.circle(screen, self.color, (x + wave_width // 2, center_y + radius - 2), wave_width // 2)
+            pygame.draw.circle(screen, ghost_color, (x + wave_width // 2, center_y + radius - 2), wave_width // 2)
         
         # Eyes
         eye_offset = radius // 3
@@ -281,6 +314,10 @@ def main():
         # Move Pac-Man
         pacman.move()
         
+        # Update power mode timer
+        if pacman.power_mode > 0:
+            pacman.power_mode -= 1
+        
         # Check pellet collection
         if maze[pacman.y][pacman.x] == 2:
             maze[pacman.y][pacman.x] = 0
@@ -288,6 +325,7 @@ def main():
         elif maze[pacman.y][pacman.x] == 3:
             maze[pacman.y][pacman.x] = 0
             score += 50
+            pacman.power_mode = 100  # Power mode lasts 100 frames (10 seconds)
         
         # Check if all pellets are collected
         if count_pellets() == 0:
@@ -307,20 +345,27 @@ def main():
         
         # Check collision with ghosts
         for ghost in ghosts:
-            if pacman.x == ghost.x and pacman.y == ghost.y:
-                # Game over
-                pacman.x = 14
-                pacman.y = 23
-                for ghost in ghosts:
-                    ghost.x = ghost.start_x
-                    ghost.y = ghost.start_y
+            if pacman.x == ghost.x and pacman.y == ghost.y and not ghost.eaten:
+                if pacman.power_mode > 0:
+                    # Eat the ghost
+                    ghost.eaten = True
+                    score += 200
+                else:
+                    # Game over - reset positions
+                    pacman.x = 14
+                    pacman.y = 23
+                    pacman.power_mode = 0
+                    for g in ghosts:
+                        g.x = g.start_x
+                        g.y = g.start_y
+                        g.eaten = False
         
         # Draw everything
         screen.fill(BLACK)
         draw_maze(screen)
         pacman.draw(screen)
         for ghost in ghosts:
-            ghost.draw(screen)
+            ghost.draw(screen, pacman.power_mode)
         
         # Draw score and level
         score_text = font.render(f"Score: {score}", True, WHITE)
