@@ -363,7 +363,9 @@ def main():
         elif maze[pacman.y][pacman.x] == 3:
             maze[pacman.y][pacman.x] = 0
             score += 50
-            pacman.power_mode = 100  # Power mode lasts 100 frames (10 seconds)
+            # Power mode duration decreases at higher levels (minimum 50 frames)
+            power_duration = max(50, 100 - (level - 1) * 10)
+            pacman.power_mode = power_duration
             if power_sound:
                 power_sound.play()
         
@@ -373,13 +375,27 @@ def main():
             reset_maze()
             pacman.x = 14
             pacman.y = 23
+            pacman.power_mode = 0  # Reset power mode for new level
             for ghost in ghosts:
                 ghost.x = ghost.start_x
                 ghost.y = ghost.start_y
+                ghost.eaten = False
+            
+            # Show level complete message
+            screen.fill(BLACK)
+            level_complete_font = pygame.font.Font(None, 72)
+            complete_text = level_complete_font.render("LEVEL COMPLETE!", True, YELLOW)
+            next_level_text = font.render(f"Starting Level {level}...", True, WHITE)
+            screen.blit(complete_text, (WIDTH // 2 - complete_text.get_width() // 2, HEIGHT // 2 - 50))
+            screen.blit(next_level_text, (WIDTH // 2 - next_level_text.get_width() // 2, HEIGHT // 2 + 20))
+            pygame.display.flip()
+            pygame.time.wait(2000)  # Wait 2 seconds before starting next level
         
         # Move ghosts (slower than Pac-Man)
         move_counter += 1
-        if move_counter % 2 == 0:
+        # Ghost speed increases with level (move more frequently)
+        ghost_speed = max(1, 3 - level // 2)  # Starts at every 2 frames, gets faster each level
+        if move_counter % ghost_speed == 0:
             for ghost in ghosts:
                 ghost.move(pacman)
         
